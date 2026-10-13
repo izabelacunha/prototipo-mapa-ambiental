@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: #76e12f !important; /* Verde clarinho suave */
+  color: #1e293b; /* Texto escuro e legível */
+}
