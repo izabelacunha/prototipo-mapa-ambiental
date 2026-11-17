@@ -1,0 +1,32 @@
+[
+  {
+    "id": "00003",
+    "titulo": "Descarte de resíduos",
+    "categoria": "Descarte de resíduos",
+    "local": "nefa",
+    "descricao": "vwbeanrum",
+    "status": "Enviado",
+    "data": "17/11/2026",
+    "tipo": "problema"
+  },
+  {
+    "id": "00001",
+    "titulo": "Lixo no gramado",
+    "categoria": "Descarte de resíduos",
+    "local": "C.V.",
+    "descricao": "Acúmulo de lixo descartado incorretamente próximo ao Centro de Vivência.",
+    "status": "Em análise",
+    "data": "11/10/2026",
+    "tipo": "problema"
+  },
+  {
+    "id": "00002",
+    "titulo": "Árvore caída",
+    "categoria": "Manutenção",
+    "local": "Refeitório",
+    "descricao": "Galho grande caído obstruindo a passagem próximo ao refeitório.",
+    "status": "Resolvido",
+    "data": "15/09/2026",
+    "tipo": "problema"
+  }
+]

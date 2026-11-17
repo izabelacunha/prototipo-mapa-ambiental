@@ -1,94 +1,136 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
-export default function RelatarPage() {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+const LOCAIS_CAMPUS = [
+  'Campo de Futebol',
+  'Ginásio',
+  'Piscina',
+  'NEFA',
+  'Área de Saúde',
+  'Campo de Areia',
+  'C.V.',
+  'Anexo',
+  'Salas de Aula e Lab',
+  'Refeitório',
+  'Estacionamento',
+];
+
+function FormRelatar() {
   const router = useRouter();
-  const [categoria, setCategoria] = useState('');
-  const [local, setLocal] = useState('');
+  const searchParams = useSearchParams();
+  const localInicial = searchParams.get('local') || 'NEFA';
+
+  const [categoria, setCategoria] = useState('Descarte de resíduos');
+  const [local, setLocal] = useState(LOCAIS_CAMPUS.includes(localInicial) ? localInicial : 'NEFA');
   const [descricao, setDescricao] = useState('');
-  const [protocolo, setProtocolo] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [logado, setLogado] = useState(false);
+
+  useEffect(() => {
+    setLogado(!!localStorage.getItem('token'));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoria || !descricao) {
-      alert('Por favor, preencha os campos obrigatórios (*)');
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('Você precisa fazer login antes de enviar um relato!');
+      router.push('/login');
       return;
     }
 
-    const res = await fetch('/api/relatos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categoria, local, descricao, tipo: 'problema' }),
-    });
+    setEnviando(true);
+    try {
+      const res = await fetch(`${API_URL}/api/relatos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          titulo: `${categoria} - ${local}`,
+          categoria,
+          local,
+          descricao,
+          tipo: 'problema',
+        }),
+      });
 
-    const data = await res.json();
-    if (data.success) {
-      setProtocolo(data.relato.id);
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          alert('Sua sessão expirou. Faça login novamente.');
+          router.push('/login');
+          return;
+        }
+        throw new Error(data.message || 'Erro ao enviar relato');
+      }
+
+      alert('Relato salvo no banco de dados com sucesso!');
+      router.push('/mapa');
+    } catch (err: any) {
+      alert(err.message || 'Erro ao conectar com o servidor.');
+    } finally {
+      setEnviando(false);
     }
   };
 
-  if (protocolo) {
-    return (
-      <div className="max-w-md mx-auto bg-white p-8 rounded-2xl border border-emerald-100 shadow-sm text-center space-y-4 my-8">
-        <div className="w-16 h-16 bg-emerald-100 text-emerald-700 text-3xl rounded-full flex items-center justify-center mx-auto">
-          ✓
-        </div>
-        <h2 className="text-2xl font-bold text-emerald-900">Relato enviado com sucesso!</h2>
-        <p className="text-slate-600 text-sm">O seu registro foi incluído e está aguardando análise.</p>
-        <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg font-mono font-bold text-emerald-800">
-          Protocolo #{protocolo}
-        </div>
-        <div className="pt-4 flex gap-3">
-          <button onClick={() => router.push('/relatos')} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-semibold">
-            Acompanhar
-          </button>
-          <button onClick={() => setProtocolo(null)} className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg text-sm font-semibold">
-            Novo Relato
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-xl mx-auto bg-white p-6 sm:p-8 rounded-2xl border border-emerald-100 shadow-sm space-y-6">
-      <h2 className="text-2xl font-bold text-emerald-900 border-b pb-3">Relatar problema ambiental</h2>
+    <div className="max-w-xl mx-auto bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-5">
+      <div className="border-b pb-3">
+        <h2 className="text-xl font-bold text-emerald-900">Relatar Problema Ambiental</h2>
+        <p className="text-xs text-slate-500">O relato ficará registrado permanentemente no mapa do campus.</p>
+      </div>
+
+      {!logado && (
+        <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-900 flex justify-between items-center">
+          <span>⚠️ Você precisa estar logado para registrar relatos.</span>
+          <Link href="/login" className="bg-amber-600 text-white px-3 py-1 rounded font-bold">
+            Fazer Login
+          </Link>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria do problema *</label>
-          <select 
-            value={categoria} 
-            onChange={(e) => setCategoria(e.target.value)}
-            className="w-full border rounded-lg p-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            required
+          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Local do Campus *</label>
+          <select
+            value={local}
+            onChange={(e) => setLocal(e.target.value)}
+            className="w-full border rounded-lg p-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
           >
-            <option value="">Selecione...</option>
-            <option value="Descarte de resíduos">Descarte de resíduos</option>
-            <option value="Vazamento / Água">Vazamento / Água</option>
-            <option value="Manutenção de área verde">Manutenção de área verde</option>
-            <option value="Poluição / Drenagem">Poluição / Drenagem</option>
+            {LOCAIS_CAMPUS.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Local do problema *</label>
-          <input 
-            type="text" 
-            placeholder="Ex: Bloco C, Pátio, Gramado Central..."
-            value={local} 
-            onChange={(e) => setLocal(e.target.value)}
-            className="w-full border rounded-lg p-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-            required
-          />
+          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria do Problema *</label>
+          <select
+            value={categoria}
+            onChange={(e) => setCategoria(e.target.value)}
+            className="w-full border rounded-lg p-2.5 text-sm text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+          >
+            <option value="Descarte de resíduos">Descarte irregular de resíduos / Lixo</option>
+            <option value="Manutenção de área verde">Manutenção de área verde / Poda</option>
+            <option value="Desperdício de água">Vazamento ou desperdício de água</option>
+            <option value="Consumo de energia">Luzes ou aparelhos ligados sem uso</option>
+            <option value="Outro problema ambiental">Outro problema ambiental</option>
+          </select>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Descrição da ocorrência *</label>
-          <textarea 
+          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Descrição detalhada *</label>
+          <textarea
             rows={4}
-            placeholder="Descreva a situação detalhadamente..."
+            placeholder="Descreva o que foi observado neste setor do campus..."
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
             className="w-full border rounded-lg p-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -96,20 +138,30 @@ export default function RelatarPage() {
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Imagem da ocorrência (Opcional)</label>
-          <input type="file" accept="image/*" className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
-        </div>
-
-        <div className="flex gap-3 pt-4">
-          <button type="button" onClick={() => router.back()} className="w-1/2 bg-slate-100 text-slate-700 py-2.5 rounded-lg text-sm font-semibold">
+        <div className="flex gap-3 pt-2">
+          <Link
+            href="/mapa"
+            className="flex-1 text-center bg-slate-100 text-slate-700 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-200 transition"
+          >
             Cancelar
-          </button>
-          <button type="submit" className="w-1/2 bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
-            Enviar
+          </Link>
+          <button
+            type="submit"
+            disabled={enviando}
+            className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow disabled:opacity-50"
+          >
+            {enviando ? 'Salvando...' : 'Enviar Relato'}
           </button>
         </div>
       </form>
     </div>
+  );
+}
+
+export default function RelatarPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500">Carregando formulário...</div>}>
+      <FormRelatar />
+    </Suspense>
   );
 }
